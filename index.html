@@ -1,747 +1,343 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>追星行程與記帳 App</title>
-    <!-- 載入 Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 載入 Vue 3 -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- 載入 Google Fonts -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>應援練習室 - Fanchant Trainer (純 JS 版)</title>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
-        
+        /* CSS 樣式區域 */
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #e5e7eb; /* 外部背景深一點，凸顯手機框 */
-            height: 100vh;
             margin: 0;
-            display: flex;
-            justify-content: center;
-            overflow: hidden;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden; /* 避免主頁面滾動條 */
         }
-
-        /* 隱藏 Scrollbar 但保留功能 */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        /* 手機模擬容器 */
-        #app-container {
-            width: 100%;
-            max-width: 480px; /* 手機最大寬度 */
-            height: 100%;
+        .fanchant-container {
             display: flex;
             flex-direction: column;
-            background-color: #fafafa;
+            height: 100vh;
+        }
+
+        /* 影片播放器 (為了專注練習，我們讓它不佔太多空間) */
+        .video-wrapper {
+            flex-shrink: 0;
+            height: 200px; /* 影片高度 */
+            background: #111;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #youtube-player {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 歌詞滾動區 */
+        .lyrics-wrapper {
+            flex-grow: 1;
+            overflow-y: scroll;
             position: relative;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            /* 用來遮罩歌詞邊緣，視覺上更柔和 */
+            mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
         }
 
-        /* 自定義顏色變數 */
-        :root {
-            --color-idol: #63b3b0;
-            --color-idol-dark: #4a8f8c;
-            --color-idol-light: #84c7c5;
+        .lyrics-content {
+            padding: 0 20px;
+            text-align: center;
         }
 
-        /* Modal 動畫 */
-        .modal-enter-active, .modal-leave-active {
-            transition: opacity 0.2s ease;
+        .spacer {
+            height: 40vh; /* 佔位用，讓第一句/最後一句能在中間 */
         }
-        .modal-enter-from, .modal-leave-to {
-            opacity: 0;
+
+        /* 單行歌詞樣式 */
+        .lyric-line {
+            padding: 12px 0;
+            transition: all 0.3s ease;
+            opacity: 0.3; /* 預設變暗 */
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer; /* 讓使用者可以點擊跳轉時間 */
         }
-        
-        /* Checkbox 樣式 */
-        input[type="checkbox"]:checked {
-            background-color: var(--color-idol);
-            border-color: var(--color-idol);
+
+        /* 1. 目前唱到的行 (Active 狀態) */
+        .lyric-line.active {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        /* 2. 偶像的部分 (Active 狀態) */
+        .lyric-line.active.idol-part {
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        /* 3. 粉絲應援的部分 (Active 狀態 - SHINee 色!) */
+        .lyric-line.active.fan-part {
+            color: #79E5CB; /* 湖水綠 (Pearl Aqua 類似色) */
+            font-weight: 800;
+            font-size: 1.4rem;
+            text-shadow: 0 0 15px #79E5CB, 0 0 30px #79E5CB;
+            letter-spacing: 1px;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 0.8rem;
+            background: #79E5CB;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+            transform: translateY(-2px);
+        }
+
+        /* 控制列 */
+        .controls {
+            flex-shrink: 0;
+            padding: 10px 20px;
+            background: #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #333;
+        }
+
+        .play-btn {
+            background: #79E5CB;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            color: #000;
+            transition: background 0.2s;
+        }
+        .play-btn:hover {
+            background: #5dc3a3;
+        }
+        .status {
+            font-family: monospace;
+            color: #888;
         }
     </style>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        idol: {
-                            DEFAULT: '#63b3b0',
-                            dark: '#4a8f8c',
-                            light: '#84c7c5',
-                            bg: '#eef7f6'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
 </head>
 <body>
+    <div class="fanchant-container">
+        <div class="video-wrapper">
+            <div id="youtube-player"></div>
+        </div>
 
-<div id="app" class="w-full flex justify-center h-full">
-    <div id="app-container">
+        <div class="lyrics-wrapper" id="lyrics-wrapper">
+            <div class="lyrics-content" id="lyrics-content">
+                </div>
+        </div>
+
+        <div class="controls">
+            <button id="play-btn" class="play-btn">開始練習 (Start)</button>
+            <div id="status" class="status">Time: 0:00</div>
+        </div>
+    </div>
+
+    <script>
+        // --- JavaScript 邏輯區域 ---
+
+        // 1. 資料模擬 (Mock Data: KEY - BAD LOVE)
+        const videoId = 'mBXVQlZUcOg';
+        const lyricsData = [
+            { time: 0, text: "(Intro Music)", type: 'idol' },
+            { time: 13.5, text: "Don’t need that kind of love, called love", type: 'idol' },
+            { time: 17.0, text: "(KIM KI BUM!)", type: 'fan' }, 
+            { time: 18.5, text: "Doha jil surog jid-eoghae", type: 'idol' },
+            { time: 22.0, text: "Gyeolgug-en neoman jichil geol", type: 'idol' },
+            { time: 25.5, text: "(BAD LOVE!)", type: 'fan' },
+            { time: 26.5, text: "Dwaess-eo, no more drama", type: 'idol' },
+            { time: 29.5, text: "It's a bad love, bad love", type: 'idol' },
+            { time: 33.0, text: "(Ooh Ooh Ooh!)", type: 'fan' },
+            { time: 36.5, text: "No bad love, bad love", type: 'idol' },
+            { time: 40.0, text: "끝!", type: 'idol' },
+        ];
+
+        // 2. 狀態管理
+        let player = null;
+        let timerLoop = null;
+        let isPlaying = false;
+        let currentLineIndex = -1;
         
-        <!-- 頂部導航欄 -->
-        <header class="bg-idol text-white pt-8 pb-4 px-6 shadow-md z-20 shrink-0">
-            <div class="flex justify-between items-center mb-4">
-                <div>
-                    <h1 class="text-2xl font-bold tracking-wide">{{ singerName }}</h1>
-                    <p class="text-idol-bg text-xs opacity-90">追星日記 & 行程助手</p>
-                </div>
-                <button @click="showSettings = true" class="p-2 bg-white/20 rounded-full hover:bg-white/30 transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                </button>
-            </div>
+        // DOM 元素快取
+        const playButton = document.getElementById('play-btn');
+        const statusDiv = document.getElementById('status');
+        const lyricsContent = document.getElementById('lyrics-content');
+        const lyricsWrapper = document.getElementById('lyrics-wrapper');
 
-            <!-- Tab 切換 -->
-            <div class="flex bg-idol-dark/30 p-1 rounded-xl">
-                <button v-for="tab in tabs" :key="tab.id" 
-                    @click="currentTab = tab.id"
-                    :class="['flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-300', currentTab === tab.id ? 'bg-white text-idol shadow-sm' : 'text-white hover:bg-white/10']">
-                    {{ tab.name }}
-                </button>
-            </div>
-        </header>
+        // 3. YouTube API 初始化 (當 API 載入完成時自動呼叫)
+        window.onYouTubeIframeAPIReady = function() {
+            initPlayer();
+        };
 
-        <!-- 主要內容區 (可滾動) -->
-        <main class="flex-1 overflow-y-auto no-scrollbar p-4 pb-24 bg-gray-50 relative">
-            
-            <!-- 1. 行程表視圖 -->
-            <div v-if="currentTab === 'schedule'" class="space-y-4">
-                
-                <!-- 活動選擇 Dropdown -->
-                <div class="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between sticky top-0 z-10">
-                    <div class="flex-1">
-                        <label class="text-xs text-gray-400 block ml-1 mb-1">當前活動</label>
-                        <select v-model="currentActivityId" class="w-full bg-transparent font-bold text-gray-800 outline-none text-sm sm:text-base">
-                            <option v-for="act in activities" :value="act.id">{{ act.name }} ({{ act.year }})</option>
-                        </select>
-                    </div>
-                    <button @click="showActivityModal = true" class="text-idol p-2 hover:bg-idol-bg rounded-full transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    </button>
-                </div>
-
-                <!-- 行程列表 -->
-                <div v-if="currentActivity">
-                    <div class="flex justify-between items-end mb-2 px-1">
-                        <span class="text-sm text-gray-500 font-medium">{{ currentActivity.date }}</span>
-                        <button @click="openScheduleForm()" class="text-xs bg-idol text-white px-3 py-1.5 rounded-full shadow-sm hover:bg-idol-dark transition flex items-center">
-                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> 新增行程
-                        </button>
-                    </div>
-
-                    <div v-if="currentActivity.schedules.length === 0" class="text-center py-10 text-gray-400">
-                        <svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        <p>還沒有行程，快來安排吧！</p>
-                    </div>
-
-                    <div class="space-y-3 relative">
-                        <!-- 連接線 -->
-                        <div class="absolute left-[19px] top-4 bottom-4 w-0.5 bg-gray-200 z-0" v-if="currentActivity.schedules.length > 1"></div>
-
-                        <div v-for="(item, idx) in sortedSchedules" :key="item.id" class="relative z-10 group">
-                            <div class="flex items-start">
-                                <!-- 時間軸點 -->
-                                <div class="w-10 flex-shrink-0 flex flex-col items-center pt-1">
-                                    <div class="w-3 h-3 rounded-full border-2 border-white shadow-sm ring-2 ring-transparent transition-all" :class="idx === 0 ? 'bg-idol ring-idol/30' : 'bg-gray-300'"></div>
-                                </div>
-                                
-                                <!-- 卡片 -->
-                                <div class="flex-1 bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <span class="text-idol font-bold text-sm block mb-0.5">{{ item.time }}</span>
-                                            <h3 class="font-bold text-gray-800 text-base">{{ item.title }}</h3>
-                                        </div>
-                                        <div class="flex space-x-2">
-                                            <button @click="openScheduleForm(item)" class="text-gray-300 hover:text-idol p-1">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                            </button>
-                                            <button @click="deleteSchedule(item.id)" class="text-gray-300 hover:text-red-500 p-1">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- 地點與導航 -->
-                                    <div v-if="item.location" class="mt-2 flex items-center text-xs text-gray-500 bg-gray-50 p-2 rounded-lg cursor-pointer hover:bg-idol-bg hover:text-idol-dark transition group/loc" @click="openMap(item.location)">
-                                        <svg class="w-3.5 h-3.5 mr-1.5 flex-shrink-0 text-gray-400 group-hover/loc:text-idol" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                        <span class="truncate">{{ item.location }}</span>
-                                        <span class="ml-auto text-idol font-bold opacity-0 group-hover/loc:opacity-100 transition-opacity">導航 ></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div v-else class="text-center py-10 text-gray-400">
-                    請先建立一個活動
-                </div>
-            </div>
-
-            <!-- 2. 記帳系統視圖 -->
-            <div v-if="currentTab === 'accounting'" class="space-y-6">
-                
-                <!-- 總覽卡片 -->
-                <div class="bg-gradient-to-br from-idol to-idol-dark text-white p-5 rounded-2xl shadow-lg relative overflow-hidden">
-                    <div class="relative z-10">
-                        <p class="text-idol-bg text-sm font-medium opacity-90">本次活動總支出</p>
-                        <h2 class="text-3xl font-bold mt-1 tracking-tight">$ {{ formatMoney(totalExpense) }}</h2>
-                        <div class="mt-4 flex gap-2">
-                            <span class="text-xs bg-white/20 px-2 py-1 rounded backdrop-blur-sm">人數: {{ participants.length }}</span>
-                            <span class="text-xs bg-white/20 px-2 py-1 rounded backdrop-blur-sm">人均: $ {{ formatMoney(participants.length ? totalExpense / participants.length : 0) }}</span>
-                        </div>
-                    </div>
-                    <!-- 裝飾圓圈 -->
-                    <div class="absolute -right-4 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-                </div>
-
-                <!-- 分帳結果 -->
-                <div v-if="debts.length > 0" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-                    <h3 class="font-bold text-gray-800 mb-3 flex items-center text-sm">
-                        <svg class="w-4 h-4 mr-1 text-idol" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                        結算 (誰給誰錢)
-                    </h3>
-                    <div class="space-y-2">
-                        <div v-for="(debt, i) in debts" :key="i" class="flex items-center justify-between text-sm p-2 bg-gray-50 rounded-lg">
-                            <div class="flex items-center">
-                                <span class="font-bold text-gray-800">{{ debt.from }}</span>
-                                <span class="text-gray-400 mx-2 text-xs">給</span>
-                                <span class="font-bold text-idol-dark">{{ debt.to }}</span>
-                            </div>
-                            <span class="font-bold text-gray-700">$ {{ formatMoney(debt.amount) }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 記帳列表 -->
-                <div>
-                    <div class="flex justify-between items-center mb-2 px-1">
-                        <h3 class="font-bold text-gray-700 text-sm">支出明細</h3>
-                        <button @click="openExpenseModal" class="text-xs text-idol font-bold border border-idol px-3 py-1 rounded-full hover:bg-idol hover:text-white transition flex items-center">
-                            <span class="text-lg leading-none mr-0.5 mb-0.5">+</span> 記一筆
-                        </button>
-                    </div>
-                    
-                    <div class="space-y-3 pb-20">
-                        <div v-for="exp in expenses" :key="exp.id" class="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
-                            <div>
-                                <p class="font-bold text-gray-800 text-sm">{{ exp.item }}</p>
-                                <p class="text-xs text-gray-500 mt-0.5"><span class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{{ exp.payer }}</span> 先付</p>
-                            </div>
-                            <div class="text-right flex items-center">
-                                <p class="font-bold text-idol mr-3">$ {{ formatMoney(exp.amount) }}</p>
-                                <button @click="deleteExpense(exp.id)" class="text-gray-300 hover:text-red-400 p-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                         <div v-if="expenses.length === 0" class="text-center py-8 text-gray-400 text-sm bg-white rounded-xl border border-dashed border-gray-200">
-                            尚未有任何支出紀錄
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 成員管理 (固定在底部) -->
-                <div class="fixed bottom-0 left-0 w-full flex justify-center pointer-events-none z-10">
-                    <div class="w-full max-w-[480px] bg-white p-3 rounded-t-2xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] border-t border-gray-100 pointer-events-auto">
-                        <div class="flex justify-between items-center mb-2">
-                             <h3 class="font-bold text-gray-700 text-xs">分帳成員</h3>
-                        </div>
-                        <div class="flex flex-wrap gap-2 items-center">
-                            <div v-for="(p, idx) in participants" :key="idx" class="bg-idol-bg text-idol-dark text-xs px-3 py-1.5 rounded-full font-medium flex items-center shadow-sm">
-                                {{ p }}
-                                <button @click="removeParticipant(idx)" class="ml-1.5 hover:text-red-500 font-bold">×</button>
-                            </div>
-                            <div class="flex items-center">
-                                <input v-model="newParticipant" @keyup.enter="addParticipant" type="text" placeholder="加人..." class="text-xs bg-gray-100 border-none rounded-full px-3 py-1.5 w-20 outline-none focus:ring-1 focus:ring-idol transition-all focus:w-24">
-                                <button @click="addParticipant" class="ml-1 text-idol hover:text-idol-dark p-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. 年度回顧視圖 -->
-            <div v-if="currentTab === 'review'" class="space-y-4">
-                <h2 class="text-lg font-bold text-gray-800 px-1">年度追星總結</h2>
-                
-                <div v-for="(yearData, year) in yearlySummary" :key="year" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="bg-idol-bg p-3 flex justify-between items-center">
-                        <span class="font-bold text-idol-dark text-lg flex items-center">
-                            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                            {{ year }} 年
-                        </span>
-                        <span class="text-xs bg-white text-idol px-2 py-0.5 rounded-md font-bold shadow-sm">{{ yearData.count }} 場活動</span>
-                    </div>
-                    <div class="p-4">
-                        <div class="relative pl-4 border-l-2 border-gray-100 space-y-5">
-                            <div v-for="act in yearData.activities" :key="act.id" class="relative">
-                                <div class="absolute -left-[21px] top-1.5 w-3 h-3 bg-idol rounded-full border-2 border-white ring-2 ring-gray-50"></div>
-                                <h4 class="font-bold text-gray-800 text-sm">{{ act.name }}</h4>
-                                <p class="text-xs text-gray-500 font-mono mt-0.5">{{ act.date }}</p>
-                                <div class="mt-1 flex flex-wrap gap-1">
-                                     <span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded" v-if="act.schedules.length > 0">
-                                        📍 {{ Array.from(new Set(act.schedules.map(s=>s.location).filter(l=>l))).length }} 地點
-                                     </span>
-                                     <span class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded" v-if="act.schedules.length > 0">
-                                        📝 {{ act.schedules.length }} 行程
-                                     </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div v-if="Object.keys(yearlySummary).length === 0" class="text-center py-10 text-gray-400">
-                    <p>累積足跡後，這裡會顯示年度回顧喔！</p>
-                </div>
-            </div>
-
-        </main>
-    </div>
-
-    <!-- Modals -->
-    
-    <!-- 1. 新增/編輯行程 Modal -->
-    <transition name="modal">
-    <div v-if="showScheduleModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-xs rounded-2xl shadow-2xl p-6 transform transition-all scale-100">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">{{ editingScheduleId ? '編輯行程' : '新增行程' }}</h3>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-gray-500 font-bold block mb-1">時間</label>
-                    <input v-model="scheduleForm.time" type="time" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-idol focus:ring-1 focus:ring-idol transition">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500 font-bold block mb-1">活動內容</label>
-                    <input v-model="scheduleForm.title" type="text" placeholder="例：排隊進場" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-idol focus:ring-1 focus:ring-idol transition">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500 font-bold block mb-1">地點</label>
-                    <input v-model="scheduleForm.location" type="text" placeholder="例：台北小巨蛋 (可導航)" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-idol focus:ring-1 focus:ring-idol transition">
-                </div>
-            </div>
-            <div class="flex gap-3 mt-6">
-                <button @click="showScheduleModal = false" class="flex-1 py-3 text-gray-500 font-bold rounded-xl bg-gray-100 hover:bg-gray-200 transition">取消</button>
-                <button @click="saveSchedule" class="flex-1 py-3 bg-idol text-white font-bold rounded-xl shadow-lg shadow-idol/30 hover:bg-idol-dark transition transform active:scale-95">儲存</button>
-            </div>
-        </div>
-    </div>
-    </transition>
-
-    <!-- 2. 記帳 Modal -->
-    <transition name="modal">
-    <div v-if="showExpenseModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-xs rounded-2xl shadow-2xl p-6">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">記一筆支出</h3>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-gray-500 font-bold block mb-1">項目</label>
-                    <input v-model="expenseForm.item" type="text" placeholder="例：晚餐、計程車" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-idol focus:ring-1 focus:ring-idol transition">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500 font-bold block mb-1">金額</label>
-                    <input v-model.number="expenseForm.amount" type="number" placeholder="0" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-idol focus:ring-1 focus:ring-idol transition">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500 font-bold block mb-1">誰先墊付？</label>
-                    <select v-model="expenseForm.payer" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-idol focus:ring-1 focus:ring-idol transition appearance-none">
-                        <option v-for="p in participants" :value="p">{{ p }}</option>
-                    </select>
-                </div>
-            </div>
-            <div class="flex gap-3 mt-6">
-                <button @click="showExpenseModal = false" class="flex-1 py-3 text-gray-500 font-bold rounded-xl bg-gray-100 hover:bg-gray-200 transition">取消</button>
-                <button @click="addExpense" class="flex-1 py-3 bg-idol text-white font-bold rounded-xl shadow-lg shadow-idol/30 hover:bg-idol-dark transition transform active:scale-95">新增</button>
-            </div>
-        </div>
-    </div>
-    </transition>
-
-    <!-- 3. 設定 & 活動管理 Modal -->
-    <transition name="modal">
-    <div v-if="showSettings" class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center backdrop-blur-sm">
-        <div class="bg-white w-full max-w-[480px] sm:max-w-xs sm:rounded-2xl rounded-t-2xl shadow-2xl p-6 h-[85vh] sm:h-auto overflow-y-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold text-gray-800">App 設定</h3>
-                <button @click="showSettings = false" class="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition">
-                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
-            
-            <div class="space-y-6">
-                <!-- 歌手設定 -->
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <label class="block text-xs font-bold text-gray-400 uppercase mb-2">本命歌手/團體</label>
-                    <input v-model="singerName" type="text" class="w-full bg-transparent border-b-2 border-gray-200 py-1 outline-none focus:border-idol text-lg font-bold text-idol-dark transition">
-                </div>
-
-                <!-- 活動管理 -->
-                <div>
-                    <div class="flex justify-between items-center mb-3">
-                        <label class="block text-sm font-bold text-gray-700">我的行程列表</label>
-                        <button @click="showActivityModal = true; showSettings = false" class="text-xs bg-idol text-white px-3 py-1.5 rounded-full font-bold shadow hover:bg-idol-dark transition">+ 新增活動</button>
-                    </div>
-                    <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
-                        <div v-for="act in activities" :key="act.id" class="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                            <div @click="switchActivity(act.id)" class="cursor-pointer flex-1">
-                                <p class="text-sm font-bold text-gray-800" :class="{'text-idol': currentActivityId === act.id}">{{ act.name }}</p>
-                                <p class="text-xs text-gray-500">{{ act.date }}</p>
-                            </div>
-                            <button @click="deleteActivity(act.id)" class="text-gray-300 hover:text-red-500 p-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 清除資料按鈕 -->
-                <div class="pt-4 border-t border-gray-100 text-center">
-                    <button @click="resetData" class="text-xs text-red-300 underline hover:text-red-500">重置所有資料 (無法復原)</button>
-                    <p class="text-[10px] text-gray-300 mt-2">Data stored locally on device</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    </transition>
-
-    <!-- 4. 新增活動 Modal -->
-    <transition name="modal">
-    <div v-if="showActivityModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-xs rounded-2xl shadow-2xl p-6">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">建立新活動</h3>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-gray-500 font-bold block mb-1">活動名稱</label>
-                    <input v-model="newActivityForm.name" type="text" placeholder="例：台北小巨蛋演唱會" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-idol focus:ring-1 focus:ring-idol transition">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-500 font-bold block mb-1">日期</label>
-                    <input v-model="newActivityForm.date" type="date" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 outline-none focus:border-idol focus:ring-1 focus:ring-idol transition">
-                </div>
-            </div>
-            <div class="flex gap-3 mt-6">
-                <button @click="showActivityModal = false" class="flex-1 py-3 text-gray-500 font-bold rounded-xl bg-gray-100 hover:bg-gray-200 transition">取消</button>
-                <button @click="addActivity" class="flex-1 py-3 bg-idol text-white font-bold rounded-xl shadow-lg shadow-idol/30 hover:bg-idol-dark transition transform active:scale-95">建立</button>
-            </div>
-        </div>
-    </div>
-    </transition>
-
-</div>
-
-<script>
-    const { createApp, ref, computed, reactive, watch, onMounted } = Vue;
-
-    createApp({
-        setup() {
-            // LocalStorage Key
-            const STORAGE_KEY = 'idol_planner_v2';
-
-            // 基本資料
-            const singerName = ref('IU');
-            const currentTab = ref('schedule');
-            const tabs = [
-                { id: 'schedule', name: '行程' },
-                { id: 'accounting', name: '記帳' },
-                { id: 'review', name: '回顧' }
-            ];
-
-            // 預設資料
-            const defaultActivities = [
-                { 
-                    id: 1, 
-                    name: '首爾安可場', 
-                    date: '2024-03-02', 
-                    year: '2024',
-                    schedules: [
-                        { id: 101, time: '10:00', title: '抵達仁川機場', location: 'Incheon Airport' },
-                        { id: 102, time: '14:00', title: '領取票券 & 周邊', location: 'KSPO DOME' },
-                        { id: 103, time: '18:00', title: '演唱會開始', location: 'KSPO DOME' }
-                    ]
+        function initPlayer() {
+            player = new YT.Player('youtube-player', {
+                height: '100%',
+                width: '100%',
+                videoId: videoId,
+                playerVars: { 
+                    'playsinline': 1, 
+                    'controls': 0, // 隱藏原生控制列
+                    'modestbranding': 1,
+                    'rel': 0 
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
                 }
-            ];
-
-            const activities = ref([]);
-            const currentActivityId = ref(null);
-
-            // 記帳資料
-            const participants = ref(['我', '朋友A']);
-            const newParticipant = ref('');
-            const expenses = ref([]);
-
-            // UI 狀態
-            const showSettings = ref(false);
-            const showScheduleModal = ref(false);
-            const showExpenseModal = ref(false);
-            const showActivityModal = ref(false);
-
-            // 表單
-            const scheduleForm = reactive({ time: '', title: '', location: '' });
-            const editingScheduleId = ref(null);
-            const expenseForm = reactive({ item: '', amount: '', payer: '' });
-            const newActivityForm = reactive({ name: '', date: '' });
-
-            // --- 資料存取邏輯 ---
-            
-            const loadData = () => {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    try {
-                        const data = JSON.parse(saved);
-                        singerName.value = data.singerName || 'IU';
-                        activities.value = data.activities || defaultActivities;
-                        participants.value = data.participants || ['我', '朋友A'];
-                        expenses.value = data.expenses || [];
-                    } catch (e) {
-                        console.error("資料損壞，重置為預設值");
-                        activities.value = defaultActivities;
-                    }
-                } else {
-                    activities.value = defaultActivities;
-                }
-
-                // 確保有一個選中的活動
-                if (activities.value.length > 0 && !currentActivityId.value) {
-                    currentActivityId.value = activities.value[0].id;
-                }
-            };
-
-            const saveData = () => {
-                const data = {
-                    singerName: singerName.value,
-                    activities: activities.value,
-                    participants: participants.value,
-                    expenses: expenses.value
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            };
-
-            const resetData = () => {
-                if(confirm("確定要刪除所有資料重來嗎？")) {
-                    localStorage.removeItem(STORAGE_KEY);
-                    location.reload();
-                }
-            };
-
-            // 自動存檔監聽
-            watch([singerName, activities, participants, expenses], () => {
-                saveData();
-            }, { deep: true });
-
-            onMounted(() => {
-                loadData();
             });
-
-            // --- Computed ---
-
-            const currentActivity = computed(() => {
-                return activities.value.find(a => a.id === currentActivityId.value) || null;
-            });
-
-            const sortedSchedules = computed(() => {
-                if (!currentActivity.value) return [];
-                return [...currentActivity.value.schedules].sort((a, b) => a.time.localeCompare(b.time));
-            });
-
-            const totalExpense = computed(() => {
-                return expenses.value.reduce((sum, item) => sum + item.amount, 0);
-            });
-
-            // 分帳演算法
-            const debts = computed(() => {
-                if (participants.value.length === 0) return [];
-                let balance = {};
-                participants.value.forEach(p => balance[p] = 0);
-                
-                const perPerson = totalExpense.value / participants.value.length;
-                
-                expenses.value.forEach(exp => {
-                    if (balance[exp.payer] !== undefined) {
-                        balance[exp.payer] += exp.amount;
-                    }
-                });
-                
-                let debtors = [];
-                let creditors = [];
-                
-                for (let p in balance) {
-                    let diff = balance[p] - perPerson;
-                    if (diff < -0.01) debtors.push({ name: p, amount: -diff });
-                    if (diff > 0.01) creditors.push({ name: p, amount: diff });
-                }
-                
-                let result = [];
-                let i = 0, j = 0;
-                while (i < debtors.length && j < creditors.length) {
-                    let amount = Math.min(debtors[i].amount, creditors[j].amount);
-                    if (amount > 0) {
-                        result.push({
-                            from: debtors[i].name,
-                            to: creditors[j].name,
-                            amount: Math.round(amount)
-                        });
-                    }
-                    debtors[i].amount -= amount;
-                    creditors[j].amount -= amount;
-                    if (debtors[i].amount < 0.01) i++;
-                    if (creditors[j].amount < 0.01) j++;
-                }
-                return result;
-            });
-
-            const yearlySummary = computed(() => {
-                const summary = {};
-                activities.value.forEach(act => {
-                    const year = act.year || act.date.substring(0, 4);
-                    if (!summary[year]) summary[year] = { count: 0, activities: [] };
-                    summary[year].count++;
-                    summary[year].activities.push(act);
-                });
-                return Object.keys(summary).sort().reverse().reduce((obj, key) => { 
-                    obj[key] = summary[key]; 
-                    return obj;
-                }, {});
-            });
-
-            // --- Methods ---
-
-            // 行程
-            const openScheduleForm = (item = null) => {
-                if (item) {
-                    editingScheduleId.value = item.id;
-                    scheduleForm.time = item.time;
-                    scheduleForm.title = item.title;
-                    scheduleForm.location = item.location;
-                } else {
-                    editingScheduleId.value = null;
-                    scheduleForm.time = '';
-                    scheduleForm.title = '';
-                    scheduleForm.location = '';
-                }
-                showScheduleModal.value = true;
-            };
-
-            const saveSchedule = () => {
-                if (!currentActivity.value) return;
-                
-                if (editingScheduleId.value) {
-                    const idx = currentActivity.value.schedules.findIndex(s => s.id === editingScheduleId.value);
-                    if (idx !== -1) {
-                        currentActivity.value.schedules[idx] = { 
-                            ...currentActivity.value.schedules[idx], 
-                            ...scheduleForm 
-                        };
-                    }
-                } else {
-                    currentActivity.value.schedules.push({
-                        id: Date.now(),
-                        ...scheduleForm
-                    });
-                }
-                showScheduleModal.value = false;
-            };
-
-            const deleteSchedule = (id) => {
-                if (!confirm('確定刪除此行程嗎？')) return;
-                const idx = currentActivity.value.schedules.findIndex(s => s.id === id);
-                if (idx !== -1) currentActivity.value.schedules.splice(idx, 1);
-            };
-
-            const openMap = (location) => {
-                if (!location) return;
-                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank');
-            };
-
-            // 記帳
-            const addParticipant = () => {
-                if (newParticipant.value && !participants.value.includes(newParticipant.value)) {
-                    participants.value.push(newParticipant.value);
-                    newParticipant.value = '';
-                }
-            };
-            
-            const removeParticipant = (index) => {
-                if (confirm('刪除成員會影響計算，確定嗎？')) {
-                    participants.value.splice(index, 1);
-                }
-            };
-
-            const openExpenseModal = () => {
-                expenseForm.item = '';
-                expenseForm.amount = '';
-                expenseForm.payer = participants.value[0] || '';
-                showExpenseModal.value = true;
-            };
-
-            const addExpense = () => {
-                if (!expenseForm.item || !expenseForm.amount || !expenseForm.payer) return;
-                expenses.value.push({
-                    id: Date.now(),
-                    item: expenseForm.item,
-                    amount: parseFloat(expenseForm.amount),
-                    payer: expenseForm.payer
-                });
-                showExpenseModal.value = false;
-            };
-
-            const deleteExpense = (id) => {
-                if (!confirm('確定刪除此筆支出？')) return;
-                expenses.value = expenses.value.filter(e => e.id !== id);
-            };
-
-            // 活動
-            const addActivity = () => {
-                if (!newActivityForm.name || !newActivityForm.date) return;
-                const newId = Date.now();
-                activities.value.push({
-                    id: newId,
-                    name: newActivityForm.name,
-                    date: newActivityForm.date,
-                    year: newActivityForm.date.substring(0, 4),
-                    schedules: []
-                });
-                currentActivityId.value = newId;
-                showActivityModal.value = false;
-                newActivityForm.name = '';
-                newActivityForm.date = '';
-            };
-
-            const deleteActivity = (id) => {
-                if (!confirm('刪除活動會一併刪除該活動的所有行程，確定嗎？')) return;
-                activities.value = activities.value.filter(a => a.id !== id);
-                if (currentActivityId.value === id) {
-                    currentActivityId.value = activities.value.length > 0 ? activities.value[0].id : null;
-                }
-            };
-
-            const switchActivity = (id) => {
-                currentActivityId.value = id;
-                showSettings.value = false;
-            };
-
-            const formatMoney = (val) => Math.round(val).toLocaleString();
-
-            return {
-                singerName, currentTab, tabs, activities, currentActivityId, currentActivity, sortedSchedules,
-                scheduleForm, editingScheduleId, showScheduleModal, openScheduleForm, saveSchedule, deleteSchedule, openMap,
-                participants, newParticipant, expenses, showExpenseModal, expenseForm, openExpenseModal, addExpense, deleteExpense,
-                addParticipant, removeParticipant, totalExpense, debts, formatMoney,
-                showSettings, showActivityModal, newActivityForm, addActivity, deleteActivity, switchActivity, resetData, yearlySummary
-            };
         }
-    }).mount('#app');
-</script>
+        
+        function onPlayerReady(event) {
+            renderLyrics();
+            // 啟用播放按鈕
+            playButton.disabled = false;
+            playButton.textContent = '開始練習 (Start)';
+        }
 
+        function onPlayerStateChange(event) {
+            // YT.PlayerState.PLAYING (1)
+            if (event.data === 1) {
+                isPlaying = true;
+                playButton.textContent = '暫停 (Pause)';
+                startSyncLoop();
+            } else {
+                isPlaying = false;
+                playButton.textContent = '繼續 (Resume)';
+                stopSyncLoop();
+            }
+        }
+
+        // 4. 播放控制
+        playButton.addEventListener('click', togglePlay);
+        function togglePlay() {
+            if (!player) return;
+            if (isPlaying) {
+                player.pauseVideo();
+            } else {
+                player.playVideo();
+            }
+        }
+        
+        // 5. 歌詞渲染 (在頁面載入和播放器準備好後執行)
+        function renderLyrics() {
+            // 加入佔位符，讓第一句能捲到中間
+            lyricsContent.innerHTML = '<div class="spacer"></div>';
+            
+            lyricsData.forEach((line, index) => {
+                const lineElement = document.createElement('div');
+                lineElement.className = `lyric-line ${line.type}-part`;
+                lineElement.textContent = line.text;
+                lineElement.dataset.index = index;
+                
+                // 應援行加入提示標籤
+                if (line.type === 'fan') {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge';
+                    badge.textContent = '應援!';
+                    lineElement.appendChild(badge);
+                }
+
+                // 點擊歌詞跳轉時間
+                lineElement.addEventListener('click', () => {
+                    if (player) {
+                        player.seekTo(line.time, true);
+                        if (!isPlaying) player.playVideo();
+                    }
+                });
+
+                lyricsContent.appendChild(lineElement);
+            });
+            
+            // 加入佔位符，讓最後一句能捲到中間
+            lyricsContent.innerHTML += '<div class="spacer"></div>';
+        }
+
+        // 6. 核心同步邏輯 (使用 requestAnimationFrame 確保流暢度)
+        function startSyncLoop() {
+            stopSyncLoop(); // 防止重複開啟
+            const loop = () => {
+                if (player && player.getCurrentTime) {
+                    const currentTime = player.getCurrentTime();
+                    
+                    // 格式化時間並顯示
+                    statusDiv.textContent = `Time: ${formatTime(currentTime)}`;
+
+                    // 找出當前時間對應的歌詞索引
+                    // findLastIndex 邏輯：找到最後一句開始時間 <= 當前時間 的歌詞
+                    const index = findCurrentLyricIndex(currentTime);
+                    
+                    if (index !== -1 && index !== currentLineIndex) {
+                        updateActiveLyric(index);
+                        currentLineIndex = index;
+                    }
+                }
+                timerLoop = requestAnimationFrame(loop);
+            };
+            loop();
+        }
+        
+        function stopSyncLoop() {
+            if (timerLoop) cancelAnimationFrame(timerLoop);
+        }
+
+        // 7. 邏輯：判斷當前歌詞索引
+        function findCurrentLyricIndex(time) {
+            let latestIndex = -1;
+            for (let i = 0; i < lyricsData.length; i++) {
+                if (lyricsData[i].time <= time) {
+                    latestIndex = i;
+                } else {
+                    break;
+                }
+            }
+            return latestIndex;
+        }
+
+        // 8. 視覺：更新 CSS 類別和自動捲動
+        function updateActiveLyric(newIndex) {
+            // 清除舊的 active 狀態
+            const oldActive = document.querySelector('.lyric-line.active');
+            if (oldActive) {
+                oldActive.classList.remove('active');
+            }
+
+            // 設置新的 active 狀態
+            const newActive = lyricsContent.children[newIndex + 1]; // +1 是為了跳過第一個 .spacer
+            if (newActive) {
+                newActive.classList.add('active');
+                
+                // 自動捲動到中間
+                newActive.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }
+        }
+
+        // 9. 工具：格式化時間
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min}:${sec < 10 ? '0' + sec : sec}`;
+        }
+        
+        // 頁面載入時禁用按鈕，直到播放器準備好
+        playButton.disabled = true;
+        playButton.textContent = '載入中...';
+
+    </script>
 </body>
 </html>
