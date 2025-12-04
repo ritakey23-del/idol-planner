@@ -3,130 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>應援練習室 - Fanchant Trainer (純 JS 版)</title>
+    <title>KEY - HUNTER 應援練習室 (純 JS 版)</title>
     <script src="https://www.youtube.com/iframe_api"></script>
     
     <style>
-        /* CSS 樣式區域 */
-        body {
-            margin: 0;
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #000;
-            color: #fff;
-            overflow: hidden; /* 避免主頁面滾動條 */
-        }
-        .fanchant-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-
-        /* 影片播放器 (為了專注練習，我們讓它不佔太多空間) */
-        .video-wrapper {
-            flex-shrink: 0;
-            height: 200px; /* 影片高度 */
-            background: #111;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        #youtube-player {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* 歌詞滾動區 */
-        .lyrics-wrapper {
-            flex-grow: 1;
-            overflow-y: scroll;
-            position: relative;
-            /* 用來遮罩歌詞邊緣，視覺上更柔和 */
-            mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
-            -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
-        }
-
-        .lyrics-content {
-            padding: 0 20px;
-            text-align: center;
-        }
-
-        .spacer {
-            height: 40vh; /* 佔位用，讓第一句/最後一句能在中間 */
-        }
-
-        /* 單行歌詞樣式 */
-        .lyric-line {
-            padding: 12px 0;
-            transition: all 0.3s ease;
-            opacity: 0.3; /* 預設變暗 */
-            font-size: 1.1rem;
-            font-weight: 500;
-            cursor: pointer; /* 讓使用者可以點擊跳轉時間 */
-        }
-
-        /* 1. 目前唱到的行 (Active 狀態) */
-        .lyric-line.active {
-            opacity: 1;
-            transform: scale(1.1);
-        }
-
-        /* 2. 偶像的部分 (Active 狀態) */
-        .lyric-line.active.idol-part {
-            color: #ffffff;
-            text-shadow: 0 0 10px rgba(255,255,255,0.5);
-        }
-
-        /* 3. 粉絲應援的部分 (Active 狀態 - SHINee 色!) */
-        .lyric-line.active.fan-part {
-            color: #79E5CB; /* 湖水綠 (Pearl Aqua 類似色) */
-            font-weight: 800;
-            font-size: 1.4rem;
-            text-shadow: 0 0 15px #79E5CB, 0 0 30px #79E5CB;
-            letter-spacing: 1px;
-        }
-
-        .badge {
-            display: inline-block;
-            font-size: 0.8rem;
-            background: #79E5CB;
-            color: #000;
-            padding: 2px 6px;
-            border-radius: 4px;
-            margin-left: 8px;
-            vertical-align: middle;
-            transform: translateY(-2px);
-        }
-
-        /* 控制列 */
-        .controls {
-            flex-shrink: 0;
-            padding: 10px 20px;
-            background: #111;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top: 1px solid #333;
-        }
-
-        .play-btn {
-            background: #79E5CB;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 30px;
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            color: #000;
-            transition: background 0.2s;
-        }
-        .play-btn:hover {
-            background: #5dc3a3;
-        }
-        .status {
-            font-family: monospace;
-            color: #888;
-        }
+        /* CSS 樣式區域 (與 BAD LOVE 版本相同，使用 SHINee 湖水綠強調色) */
+        body { margin: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #000; color: #fff; overflow: hidden; }
+        .fanchant-container { display: flex; flex-direction: column; height: 100vh; }
+        .video-wrapper { flex-shrink: 0; height: 200px; background: #111; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        #youtube-player { width: 100%; height: 100%; }
+        .lyrics-wrapper { flex-grow: 1; overflow-y: scroll; position: relative; mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent); -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent); }
+        .lyrics-content { padding: 0 20px; text-align: center; }
+        .spacer { height: 40vh; }
+        .lyric-line { padding: 12px 0; transition: all 0.3s ease; opacity: 0.3; font-size: 1.1rem; font-weight: 500; cursor: pointer; }
+        .lyric-line.active { opacity: 1; transform: scale(1.1); }
+        .lyric-line.active.idol-part { color: #ffffff; text-shadow: 0 0 10px rgba(255,255,255,0.5); }
+        /* 粉絲應援：SHINee 湖水綠 */
+        .lyric-line.active.fan-part { color: #79E5CB; font-weight: 800; font-size: 1.4rem; text-shadow: 0 0 15px #79E5CB, 0 0 30px #79E5CB; letter-spacing: 1px; }
+        .badge { display: inline-block; font-size: 0.8rem; background: #79E5CB; color: #000; padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; transform: translateY(-2px); }
+        .controls { flex-shrink: 0; padding: 10px 20px; background: #111; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #333; }
+        .play-btn { background: #79E5CB; border: none; padding: 10px 24px; border-radius: 30px; font-weight: bold; font-size: 1rem; cursor: pointer; color: #000; transition: background 0.2s; }
+        .play-btn:hover { background: #5dc3a3; }
+        .status { font-family: monospace; color: #888; }
     </style>
 </head>
 <body>
@@ -134,14 +32,12 @@
         <div class="video-wrapper">
             <div id="youtube-player"></div>
         </div>
-
         <div class="lyrics-wrapper" id="lyrics-wrapper">
             <div class="lyrics-content" id="lyrics-content">
                 </div>
         </div>
-
         <div class="controls">
-            <button id="play-btn" class="play-btn">開始練習 (Start)</button>
+            <button id="play-btn" class="play-btn">載入中...</button>
             <div id="status" class="status">Time: 0:00</div>
         </div>
     </div>
@@ -149,196 +45,36 @@
     <script>
         // --- JavaScript 邏輯區域 ---
 
-        // 1. 資料模擬 (Mock Data: KEY - BAD LOVE)
-        const videoId = 'aEHiNKJgYao';
+        // 1. 歌曲與資料 (KEY - HUNTER)
+        const videoId = 'ktCF5D6ECk0'; // KEY 'HUNTER' Official MV ID
         const lyricsData = [
-            { time: 0, text: "(Intro Music)", type: 'idol' },
-            { time: 13.5, text: "Don’t need that kind of love, called love", type: 'idol' },
-            { time: 17.0, text: "(KIM KI BUM!)", type: 'fan' }, 
-            { time: 18.5, text: "Doha jil surog jid-eoghae", type: 'idol' },
-            { time: 22.0, text: "Gyeolgug-en neoman jichil geol", type: 'idol' },
-            { time: 25.5, text: "(BAD LOVE!)", type: 'fan' },
-            { time: 26.5, text: "Dwaess-eo, no more drama", type: 'idol' },
-            { time: 29.5, text: "It's a bad love, bad love", type: 'idol' },
-            { time: 33.0, text: "(Ooh Ooh Ooh!)", type: 'fan' },
-            { time: 36.5, text: "No bad love, bad love", type: 'idol' },
-            { time: 40.0, text: "끝!", type: 'idol' },
+            // ** 警告: 以下時間點為估計值，請根據官方應援影片調整 **
+            { time: 0.0, text: "(Intro - 節奏開始)", type: 'idol' },
+            { time: 6.8, text: "SHINee! KEY! HUNTER!", type: 'fan' }, // 慣例性開場喊聲
+            { time: 8.5, text: "긴장해 떨림을 느껴", type: 'idol' }, // 緊張地感受顫抖
+            { time: 10.3, text: "눈을 뜬 나의 밤", type: 'idol' }, // 睜開眼的我的夜晚
+            { time: 13.0, text: "KIM KI BUM!", type: 'fan' }, // 金起範!
+            { time: 15.0, text: "이젠 내가 널 찾아가", type: 'idol' }, // 現在換我來找你
+            { time: 17.5, text: "어둠 속에 갇힌 너", type: 'idol' }, // 被困在黑暗中的你
+            { time: 20.0, text: "어디 가지 마", type: 'idol' }, // 不要去任何地方
+            { time: 22.5, text: "I'm the Hunter!", type: 'fan' }, // 歌曲名稱應援
+            { time: 25.0, text: "숨어봐, 내가 널 찾을 때까지", type: 'idol' }, // 躲起來吧，直到我找到你
+            { time: 28.5, text: "키! (Ki!)", type: 'fan' }, // 單字喊聲
+            { time: 30.0, text: "심장이 뛰어. 네가 내 먹잇감", type: 'idol' }, // 心臟跳動，你就是我的獵物
+            { time: 33.5, text: "Hah! Hah! Hah!", type: 'fan' }, // 氣勢喊聲
+            { time: 36.5, text: "Chorus 開始...", type: 'idol' },
+            { time: 40.0, text: "應援結束 (請自行延伸)", type: 'idol' },
         ];
 
-        // 2. 狀態管理
+        // 2. 狀態管理 (略，與 BAD LOVE 版本相同)
         let player = null;
         let timerLoop = null;
         let isPlaying = false;
         let currentLineIndex = -1;
-        
-        // DOM 元素快取
         const playButton = document.getElementById('play-btn');
         const statusDiv = document.getElementById('status');
         const lyricsContent = document.getElementById('lyrics-content');
         const lyricsWrapper = document.getElementById('lyrics-wrapper');
 
-        // 3. YouTube API 初始化 (當 API 載入完成時自動呼叫)
-        window.onYouTubeIframeAPIReady = function() {
-            initPlayer();
-        };
-
-        function initPlayer() {
-            player = new YT.Player('youtube-player', {
-                height: '100%',
-                width: '100%',
-                videoId: videoId,
-                playerVars: { 
-                    'playsinline': 1, 
-                    'controls': 0, // 隱藏原生控制列
-                    'modestbranding': 1,
-                    'rel': 0 
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange
-                }
-            });
-        }
-        
-        function onPlayerReady(event) {
-            renderLyrics();
-            // 啟用播放按鈕
-            playButton.disabled = false;
-            playButton.textContent = '開始練習 (Start)';
-        }
-
-        function onPlayerStateChange(event) {
-            // YT.PlayerState.PLAYING (1)
-            if (event.data === 1) {
-                isPlaying = true;
-                playButton.textContent = '暫停 (Pause)';
-                startSyncLoop();
-            } else {
-                isPlaying = false;
-                playButton.textContent = '繼續 (Resume)';
-                stopSyncLoop();
-            }
-        }
-
-        // 4. 播放控制
-        playButton.addEventListener('click', togglePlay);
-        function togglePlay() {
-            if (!player) return;
-            if (isPlaying) {
-                player.pauseVideo();
-            } else {
-                player.playVideo();
-            }
-        }
-        
-        // 5. 歌詞渲染 (在頁面載入和播放器準備好後執行)
-        function renderLyrics() {
-            // 加入佔位符，讓第一句能捲到中間
-            lyricsContent.innerHTML = '<div class="spacer"></div>';
-            
-            lyricsData.forEach((line, index) => {
-                const lineElement = document.createElement('div');
-                lineElement.className = `lyric-line ${line.type}-part`;
-                lineElement.textContent = line.text;
-                lineElement.dataset.index = index;
-                
-                // 應援行加入提示標籤
-                if (line.type === 'fan') {
-                    const badge = document.createElement('span');
-                    badge.className = 'badge';
-                    badge.textContent = '應援!';
-                    lineElement.appendChild(badge);
-                }
-
-                // 點擊歌詞跳轉時間
-                lineElement.addEventListener('click', () => {
-                    if (player) {
-                        player.seekTo(line.time, true);
-                        if (!isPlaying) player.playVideo();
-                    }
-                });
-
-                lyricsContent.appendChild(lineElement);
-            });
-            
-            // 加入佔位符，讓最後一句能捲到中間
-            lyricsContent.innerHTML += '<div class="spacer"></div>';
-        }
-
-        // 6. 核心同步邏輯 (使用 requestAnimationFrame 確保流暢度)
-        function startSyncLoop() {
-            stopSyncLoop(); // 防止重複開啟
-            const loop = () => {
-                if (player && player.getCurrentTime) {
-                    const currentTime = player.getCurrentTime();
-                    
-                    // 格式化時間並顯示
-                    statusDiv.textContent = `Time: ${formatTime(currentTime)}`;
-
-                    // 找出當前時間對應的歌詞索引
-                    // findLastIndex 邏輯：找到最後一句開始時間 <= 當前時間 的歌詞
-                    const index = findCurrentLyricIndex(currentTime);
-                    
-                    if (index !== -1 && index !== currentLineIndex) {
-                        updateActiveLyric(index);
-                        currentLineIndex = index;
-                    }
-                }
-                timerLoop = requestAnimationFrame(loop);
-            };
-            loop();
-        }
-        
-        function stopSyncLoop() {
-            if (timerLoop) cancelAnimationFrame(timerLoop);
-        }
-
-        // 7. 邏輯：判斷當前歌詞索引
-        function findCurrentLyricIndex(time) {
-            let latestIndex = -1;
-            for (let i = 0; i < lyricsData.length; i++) {
-                if (lyricsData[i].time <= time) {
-                    latestIndex = i;
-                } else {
-                    break;
-                }
-            }
-            return latestIndex;
-        }
-
-        // 8. 視覺：更新 CSS 類別和自動捲動
-        function updateActiveLyric(newIndex) {
-            // 清除舊的 active 狀態
-            const oldActive = document.querySelector('.lyric-line.active');
-            if (oldActive) {
-                oldActive.classList.remove('active');
-            }
-
-            // 設置新的 active 狀態
-            const newActive = lyricsContent.children[newIndex + 1]; // +1 是為了跳過第一個 .spacer
-            if (newActive) {
-                newActive.classList.add('active');
-                
-                // 自動捲動到中間
-                newActive.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center'
-                });
-            }
-        }
-
-        // 9. 工具：格式化時間
-        function formatTime(seconds) {
-            const min = Math.floor(seconds / 60);
-            const sec = Math.floor(seconds % 60);
-            return `${min}:${sec < 10 ? '0' + sec : sec}`;
-        }
-        
-        // 頁面載入時禁用按鈕，直到播放器準備好
-        playButton.disabled = true;
-        playButton.textContent = '載入中...';
-
-    </script>
-</body>
-</html>
-
+        // 3. YouTube API 初始化 (API 載入完成時自動呼叫)
+        window.onYouTubeIframeAPIReady = function() { initPlayer(); };
